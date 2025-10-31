@@ -19,6 +19,7 @@ class Event {
   String title;
   DateTime nextOccurrence; // 此事件下一次发生的 *公历* 日期
   bool isLunar;
+  int? lunarYear;
   int? lunarMonth;
   int? lunarDay;
   bool isLeapMonth; // 是否为闰月
@@ -29,6 +30,7 @@ class Event {
     required this.title,
     required this.nextOccurrence,
     required this.isLunar,
+    this.lunarYear,
     this.lunarMonth,
     this.lunarDay,
     this.isLeapMonth = false,
@@ -42,6 +44,7 @@ class Event {
       'title': title,
       'nextOccurrence': nextOccurrence.toIso8601String(),
       'isLunar': isLunar,
+      'lunarYear': lunarYear,
       'lunarMonth': lunarMonth,
       'lunarDay': lunarDay,
       'isLeapMonth': isLeapMonth,
@@ -56,6 +59,7 @@ class Event {
       title: json['title'],
       nextOccurrence: DateTime.parse(json['nextOccurrence']),
       isLunar: json['isLunar'],
+      lunarYear: json['lunarYear'],
       lunarMonth: json['lunarMonth'],
       lunarDay: json['lunarDay'],
       isLeapMonth: json['isLeapMonth'],
@@ -168,7 +172,7 @@ class TymeUtil {
 
   // [已修复] 获取农历日期的 *下一次* 对应的公历日期
   static DateTime getNextGregorianOccurrence(
-      int lunarMonth, int lunarDay, bool isLeap) {
+      int lunarYear, int lunarMonth, int lunarDay, bool isLeap) {
     DateTime today = DateTime.now();
     DateTime todayDateOnly = DateTime(today.year, today.month, today.day);
 
@@ -357,6 +361,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<Event> _getEventsForDay(DateTime day) {
     final List<Event> events = [];
     // 1. 获取当天的农历信息
+    final LunarYear lunarYear =
+        TymeUtil.getLunarDate(day).getLunarMonth().getLunarYear();
     final LunarDay lunarDay = TymeUtil.getLunarDate(day);
 
     for (final event in _allEvents.values) {
@@ -366,9 +372,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
         int currentLunarMonth = lunarDay.getLunarMonth().getMonth();
         bool isCurrentLeap = lunarDay.getLunarMonth().isLeap();
 
-        if (event.lunarMonth == currentLunarMonth &&
+        if (event.lunarYear == lunarYear.getYear() &&
+            event.lunarMonth == currentLunarMonth &&
             event.lunarDay == lunarDay.getDay() &&
             event.isLeapMonth == isCurrentLeap) {
+          // event.lunarMonth event.lunarDay 设为汉字
           events.add(event);
         }
       } else {
@@ -392,8 +400,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  // 显示添加事件的底部弹窗
-  void _showAddEventDialog() {
+  // [已修改] 显示添加/编辑事件的底部弹窗
+  void _showAddEventDialog({Event? eventToEdit}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -406,9 +414,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
           padding:
               EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: AddEventSheet(
-            selectedDate: _selectedDay!,
+            // 如果是新增，使用日历选中的日期；如果是编辑，使用 null
+            selectedDate: eventToEdit == null ? _selectedDay! : null,
+            eventToEdit: eventToEdit,
             onSave: (Event newEvent) {
-              // 1. 保存到 Hive
+              // 1. 保存到 Hive (put 会自动覆盖)
               _eventBox.put(newEvent.id, jsonEncode(newEvent.toJson()));
               // 2. 安排通知
               NotificationService().scheduleNotification(newEvent);
@@ -423,8 +433,40 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // 删除事件
-  void _deleteEvent(Event event) async {
+  // [新功能] 显示删除确认对话框
+  void _showDeleteConfirmationDialog(BuildContext context, Event event) {
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: const Text('确认删除'),
+          content: Text('您确定要删除 "${event.title}" 吗？'),
+          actions: [
+            TextButton(
+              child: const Text('取消'),
+              onPressed: () {
+                Navigator.of(ctx).pop(false);
+              },
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('删除'),
+              onPressed: () {
+                Navigator.of(ctx).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    ).then((result) {
+      if (result == true) {
+        _performDelete(event);
+      }
+    });
+  }
+
+  // [新功能] 执行删除操作
+  void _performDelete(Event event) async {
     // 1. 从 Hive 删除
     await _eventBox.delete(event.id);
     // 2. 取消通知
@@ -451,7 +493,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         shadowColor: Colors.black.withOpacity(0.1),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddEventDialog,
+        onPressed: _showAddEventDialog, // [已修改] 现在调用不带参数的 _showAddEventDialog
         backgroundColor: Colors.teal,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -463,7 +505,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             child: TableCalendar<Event>(
               locale: 'zh_CN',
               firstDay: DateTime.utc(2010, 1, 1),
-              lastDay: DateTime.utc(2040, 12, 31),
+              lastDay: DateTime.utc(9999, 12, 31),
               focusedDay: _focusedDay,
               calendarFormat: _calendarFormat,
               eventLoader: _getEventsForDay,
@@ -592,12 +634,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
             child: ValueListenableBuilder<List<Event>>(
               valueListenable: _selectedEvents,
               builder: (context, value, _) {
+                // [新功能] 即使列表为空，也显示日期信息
                 if (value.isEmpty) {
+                  // [新功能] 实现请求 1: 显示完整的公历和农历年
+                  final LunarDay lunar = TymeUtil.getLunarDate(_selectedDay!);
+                  final LunarYear lunarYear =
+                      lunar.getLunarMonth().getLunarYear();
+                  final String solarDate =
+                      DateFormat.yMMMd('zh_CN').format(_selectedDay!);
+                  final String lunarDate =
+                      "${lunarYear.getName()} ${lunar.getLunarMonth().getName()}${lunar.getName()}";
+
                   return Center(
-                    child: Text(
-                      '${DateFormat.yMMMd('zh_CN').format(_selectedDay!)}\n无提醒事项',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text(
+                        '$solarDate\n$lunarDate\n\n无提醒事项',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: Colors.grey[600], fontSize: 16, height: 1.5),
+                      ),
                     ),
                   );
                 }
@@ -606,12 +662,57 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   itemCount: value.length,
                   itemBuilder: (context, index) {
                     final event = value[index];
+
+                    // --- [新逻辑] 开始: 构建汉化的 subtitle ---
+                    String subtitleText;
+                    if (event.isLunar) {
+                      String lunarMonthName = "";
+                      String lunarDayName = "";
+
+                      // 1. 转换月份
+                      if (event.lunarMonth != null &&
+                          event.lunarMonth! > 0 &&
+                          event.lunarMonth! <= LunarMonth.names.length) {
+                        // 使用 LunarMonth.names (0-indexed)
+                        lunarMonthName =
+                            LunarMonth.names[event.lunarMonth! - 1];
+                      } else {
+                        lunarMonthName = "${event.lunarMonth}月"; // Fallback
+                      }
+
+                      // 2. 添加 "闰"
+                      if (event.isLeapMonth) {
+                        lunarMonthName = "闰$lunarMonthName";
+                      }
+
+                      // 3. 转换日期
+                      if (event.lunarDay != null &&
+                          event.lunarDay! > 0 &&
+                          event.lunarDay! <= LunarDay.names.length) {
+                        // 使用 LunarDay.names (0-indexed)
+                        lunarDayName = LunarDay.names[event.lunarDay! - 1];
+                      } else {
+                        lunarDayName = "${event.lunarDay}日"; // Fallback
+                      }
+
+                      subtitleText =
+                          '农历: $lunarMonthName$lunarDayName ${event.isRecurring ? "(每年)" : ""}';
+                    } else {
+                      subtitleText =
+                          '公历: ${DateFormat.yMMMd('zh_CN').format(event.nextOccurrence)}';
+                    }
+                    // --- [新逻辑] 结束 ---
+
                     return Card(
                       elevation: 2,
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       child: ListTile(
+                        // [新功能] 点击列表项进行编辑
+                        onTap: () {
+                          _showAddEventDialog(eventToEdit: event);
+                        },
                         leading: Icon(
                           event.isLunar
                               ? Icons.brightness_3_outlined
@@ -622,15 +723,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             style:
                                 const TextStyle(fontWeight: FontWeight.w500)),
                         subtitle: Text(
-                          event.isLunar
-                              // 闰月显示
-                              ? '农历: ${event.isLeapMonth ? "闰" : ""}${event.lunarMonth}月${event.lunarDay}日 ${event.isRecurring ? "(每年)" : ""}'
-                              : '公历: ${DateFormat.yMMMd('zh_CN').format(event.nextOccurrence)}',
+                          subtitleText, // [已修改] 使用新的汉化字符串
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete_outline,
                               color: Colors.redAccent),
-                          onPressed: () => _deleteEvent(event),
+                          // [新功能] 调用删除确认
+                          onPressed: () =>
+                              _showDeleteConfirmationDialog(context, event),
                         ),
                       ),
                     );
@@ -645,13 +745,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 }
 
-// --- 添加事件的底部弹窗 ---
+// --- 添加/编辑事件的底部弹窗 (已重构) ---
 class AddEventSheet extends StatefulWidget {
-  final DateTime selectedDate;
+  // [新] selectedDate 仅用于“新增”，编辑时为 null
+  final DateTime? selectedDate;
+  // [新] eventToEdit 用于“编辑”，新增时为 null
+  final Event? eventToEdit;
   final Function(Event) onSave;
 
   const AddEventSheet(
-      {super.key, required this.selectedDate, required this.onSave});
+      {super.key, this.selectedDate, this.eventToEdit, required this.onSave})
+      : assert(selectedDate != null || eventToEdit != null,
+            'Either selectedDate or eventToEdit must be provided');
 
   @override
   State<AddEventSheet> createState() => _AddEventSheetState();
@@ -659,34 +764,73 @@ class AddEventSheet extends StatefulWidget {
 
 class _AddEventSheetState extends State<AddEventSheet> {
   final _titleController = TextEditingController();
-  bool _isLunar = true;
-  bool _isRecurring = true;
-  bool _isLeapMonth = false;
-
-  // 使用 tyme 的 LunarDay
-  late LunarDay _lunarInfo;
+  late bool _isLunar;
+  late bool _isRecurring;
+  late bool _isLeapMonth;
   bool _currentDayHasLeapMonth = false;
+  late bool _isEditing;
+
+  // [新] 状态变量，用于存储当前表单的日期
+  late DateTime _date;
+  late int _lunarYear;
+  late LunarDay _lunarInfo;
+  late int _lunarMonth;
+  late int _lunarDay;
 
   @override
   void initState() {
     super.initState();
-    _updateLunarInfo(widget.selectedDate);
+    _isEditing = widget.eventToEdit != null;
+
+    if (_isEditing) {
+      // --- 编辑模式 ---
+      final event = widget.eventToEdit!;
+      _titleController.text = event.title;
+      _isLunar = event.isLunar;
+      _isRecurring = event.isRecurring;
+      _isLeapMonth = event.isLeapMonth;
+
+      // [新] 使用事件的下次发生日期作为基础
+      // 注意：对于农历事件，这可能是去年的日期，但没关系，
+      // TymeUtil.getLunarDate 会正确处理它以获取 *当前* 的农历信息
+      _date = event.nextOccurrence;
+      _lunarInfo = TymeUtil.getLunarDate(_date);
+
+      if (_isLunar) {
+        // 从 *已保存* 的事件数据中加载农历信息
+        _lunarMonth = event.lunarMonth!;
+        _lunarDay = event.lunarDay!;
+        // 检查 *当前* 选中的日期是否是闰月，以决定是否显示 Checkbox
+        _currentDayHasLeapMonth = _lunarInfo.getLunarMonth().isLeap();
+      }
+    } else {
+      // --- 新增模式 ---
+      _date = widget.selectedDate!;
+      _isLunar = true; // 新事件默认是农历
+      _isRecurring = true; // 默认为true
+      _updateLunarInfo(_date); // 使用日历选中的日期初始化
+    }
   }
 
   // 当日期或类型变化时，更新农历信息
   void _updateLunarInfo(DateTime date) {
-    _lunarInfo = TymeUtil.getLunarDate(date);
+    setState(() {
+      _date = date; // 更新状态
+      _lunarInfo = TymeUtil.getLunarDate(date);
 
-    // 检查当天是否 *是* 闰月
-    // [已修复] 遵照 API, 使用 .getLunarMonth()
-    _currentDayHasLeapMonth = _lunarInfo.getLunarMonth().isLeap();
+      // [已修复] 遵照 API, 使用 .getLunarMonth()
+      _lunarYear = _lunarInfo.getLunarMonth().getLunarYear().getYear();
+      _lunarMonth = _lunarInfo.getLunarMonth().getMonth();
+      _lunarDay = _lunarInfo.getDay();
+      _currentDayHasLeapMonth = _lunarInfo.getLunarMonth().isLeap();
 
-    // 默认勾选
-    if (_currentDayHasLeapMonth) {
-      _isLeapMonth = true;
-    } else {
-      _isLeapMonth = false; // 如果不是闰月，取消勾选
-    }
+      // 默认勾选
+      if (_currentDayHasLeapMonth) {
+        _isLeapMonth = true;
+      } else {
+        _isLeapMonth = false; // 如果不是闰月，取消勾选
+      }
+    });
   }
 
   @override
@@ -695,30 +839,47 @@ class _AddEventSheetState extends State<AddEventSheet> {
     super.dispose();
   }
 
+  // [新功能] 弹出日期选择器
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2050),
+      locale: const Locale('zh', 'CN'),
+    );
+    if (picked != null && picked != _date) {
+      _updateLunarInfo(picked); // 使用新选中的日期更新所有状态
+    }
+  }
+
   void _saveEvent() {
     final title = _titleController.text;
     if (title.isEmpty) return;
 
-    final String eventId = kUuid.v4();
+    // [新] 编辑时使用旧 ID，新增时使用新 ID
+    final String eventId = widget.eventToEdit?.id ?? kUuid.v4();
     Event newEvent;
 
     if (_isLunar) {
-      // 1. 获取农历月日
-      // [已修复] 遵照 API, 使用 .getLunarMonth()
-      int lunarMonth = _lunarInfo.getLunarMonth().getMonth();
-      final int lunarDay = _lunarInfo.getDay();
+      // 1. 从 *状态* 获取农历月日
+      // (注意: _lunarMonth, _lunarDay 在 _updateLunarInfo 中被设置)
 
       // 2. 计算下一次公历发生日期
       final DateTime nextOccurrence = TymeUtil.getNextGregorianOccurrence(
-          lunarMonth, lunarDay, _isLeapMonth); // _isLeapMonth 由 Checkbox 决定
+          _lunarYear,
+          _lunarMonth,
+          _lunarDay,
+          _isLeapMonth); // _isLeapMonth 由 Checkbox 决定
 
       newEvent = Event(
         id: eventId,
         title: title,
         nextOccurrence: nextOccurrence,
         isLunar: true,
-        lunarMonth: lunarMonth,
-        lunarDay: lunarDay,
+        lunarYear: _lunarYear,
+        lunarMonth: _lunarMonth,
+        lunarDay: _lunarDay,
         isLeapMonth: _isLeapMonth, // 用户是否指定为闰月
         isRecurring: _isRecurring,
       );
@@ -727,7 +888,7 @@ class _AddEventSheetState extends State<AddEventSheet> {
       newEvent = Event(
         id: eventId,
         title: title,
-        nextOccurrence: widget.selectedDate,
+        nextOccurrence: _date, // 使用状态中的公历日期
         isLunar: false,
         isRecurring: _isRecurring,
       );
@@ -740,9 +901,10 @@ class _AddEventSheetState extends State<AddEventSheet> {
   @override
   Widget build(BuildContext context) {
     // 确保UI实时反映选中的日期
-    if (_isLunar) {
-      _updateLunarInfo(widget.selectedDate);
-    }
+    // [已修复] 遵照 API, 使用 .getName()
+    String lunarDateText =
+        "${_lunarInfo.getLunarMonth().getLunarYear().getName()}${_lunarInfo.getLunarMonth().getName()}${_lunarInfo.getName()}";
+    String gregorianDateText = DateFormat.yMMMd('zh_CN').format(_date);
 
     return SingleChildScrollView(
       child: Container(
@@ -752,7 +914,7 @@ class _AddEventSheetState extends State<AddEventSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '添加提醒事项',
+              _isEditing ? '编辑提醒事项' : '添加提醒事项',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
@@ -777,7 +939,6 @@ class _AddEventSheetState extends State<AddEventSheet> {
                   onSelected: (selected) {
                     setState(() {
                       _isLunar = true;
-                      _updateLunarInfo(widget.selectedDate);
                     });
                   },
                   selectedColor: Colors.teal.withOpacity(0.2),
@@ -797,36 +958,51 @@ class _AddEventSheetState extends State<AddEventSheet> {
             ),
             const Divider(height: 20),
 
-            if (_isLunar) ...[
-              // 显示农历日期
-              // [已修复] 遵照 API, 使用 .getName()
-              Text(
-                '农历日期: ${_lunarInfo.getLunarMonth().getName()}${_lunarInfo.getName()}',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            // --- 日期显示和更改 ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_isLunar) ...[
+                        Text(
+                          '农历日期: $lunarDateText',
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w500),
+                        ),
+                      ] else ...[
+                        Text(
+                          '公历日期: $gregorianDateText',
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _selectDate(context),
+                  child: const Text('更改日期'),
+                ),
+              ],
+            ),
+
+            // 仅当该月确实是闰月时，才显示闰月选项
+            if (_isLunar && _currentDayHasLeapMonth)
+              CheckboxListTile(
+                // [已修复] 遵照 API, 使用 .getLunarMonth().getName()
+                title: Text('设为闰${_lunarInfo.getLunarMonth().getName()}提醒'),
+                value: _isLeapMonth,
+                onChanged: (value) {
+                  setState(() {
+                    _isLeapMonth = value!;
+                  });
+                },
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
               ),
-              // 仅当该月确实是闰月时，才显示闰月选项
-              if (_currentDayHasLeapMonth)
-                CheckboxListTile(
-                  // [已修复] 遵照 API, 使用 .getLunarMonth().getName()
-                  title: Text('设为闰${_lunarInfo.getLunarMonth().getName()}提醒'),
-                  value: _isLeapMonth,
-                  onChanged: (value) {
-                    setState(() {
-                      _isLeapMonth = value!;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                )
-            ] else ...[
-              // 显示公历日期
-              Text(
-                '公历日期: ${DateFormat.yMMMd('zh_CN').format(widget.selectedDate)}',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-            ],
 
             // 每年提醒
             CheckboxListTile(
@@ -854,7 +1030,8 @@ class _AddEventSheetState extends State<AddEventSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('保存', style: TextStyle(fontSize: 16)),
+                child: Text(_isEditing ? '更新' : '保存',
+                    style: const TextStyle(fontSize: 16)),
               ),
             ),
           ],
