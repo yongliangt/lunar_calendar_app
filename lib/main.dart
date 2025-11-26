@@ -325,7 +325,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  Map<String, Event> _allEvents = {};
+  final Map<String, Event> _allEvents = {};
 
   @override
   void initState() {
@@ -372,17 +372,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
         int currentLunarMonth = lunarDay.getLunarMonth().getMonth();
         bool isCurrentLeap = lunarDay.getLunarMonth().isLeap();
 
-        if (event.lunarYear == lunarYear.getYear() &&
-            event.lunarMonth == currentLunarMonth &&
-            event.lunarDay == lunarDay.getDay() &&
-            event.isLeapMonth == isCurrentLeap) {
-          // event.lunarMonth event.lunarDay 设为汉字
-          events.add(event);
+        if (event.isRecurring) {
+          // 农历循环事件：只匹配月日和闰月标志
+          if (event.lunarMonth == currentLunarMonth &&
+              event.lunarDay == lunarDay.getDay() &&
+              event.isLeapMonth == isCurrentLeap) {
+            events.add(event);
+          }
+        } else {
+          // 农历一次性事件：需要完整匹配年月日
+          if (event.lunarYear == lunarYear.getYear() &&
+              event.lunarMonth == currentLunarMonth &&
+              event.lunarDay == lunarDay.getDay() &&
+              event.isLeapMonth == isCurrentLeap) {
+            events.add(event);
+          }
         }
       } else {
         // 3. 匹配公历事件
-        if (isSameDay(event.nextOccurrence, day) && !event.isRecurring) {
-          events.add(event);
+        if (event.isRecurring) {
+          // 公历循环事件：只匹配月日
+          if (event.nextOccurrence.month == day.month &&
+              event.nextOccurrence.day == day.day) {
+            events.add(event);
+          }
+        } else {
+          // 公历一次性事件：完整匹配年月日
+          if (isSameDay(event.nextOccurrence, day)) {
+            events.add(event);
+          }
         }
       }
     }
