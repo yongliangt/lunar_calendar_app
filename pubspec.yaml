@@ -33,6 +33,7 @@ dependencies:
   #--- 其他工具 ---
   uuid: ^4.4.0 # 生成唯一ID
   cupertino_icons: ^1.0.8
+  google_fonts: ^6.1.0 # 用于引入 Serif 字体
 
 dev_dependencies:
   flutter_test:

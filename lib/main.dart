@@ -11,6 +11,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:uuid/uuid.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'theme.dart'; // Import the new theme file
 
 // --- 数据模型 ---
 // Event 模型用于存储事件数据
@@ -290,12 +291,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '农历提醒日历',
-      theme: ThemeData(
-        primarySwatch: Colors.teal,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        useMaterial3: true,
-        fontFamily: 'Inter',
-      ),
+      theme: AppTheme.lightTheme, // Use the custom Classic Elegance theme
       // 启用中文本地化
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -501,260 +497,341 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('农历提醒日历'),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        shadowColor: Colors.black.withOpacity(0.1),
-      ),
+      backgroundColor: AppColors.backgroundBeige,
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddEventDialog, // [已修改] 现在调用不带参数的 _showAddEventDialog
-        backgroundColor: Colors.teal,
-        child: const Icon(Icons.add, color: Colors.white),
+        onPressed: _showAddEventDialog,
+        child: const Icon(Icons.add),
       ),
       body: Column(
         children: [
+          // Custom Header
           Container(
-            color: Colors.white,
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: TableCalendar<Event>(
-              locale: 'zh_CN',
-              firstDay: DateTime.utc(2010, 1, 1),
-              lastDay: DateTime.utc(9999, 12, 31),
-              focusedDay: _focusedDay,
-              calendarFormat: _calendarFormat,
-              eventLoader: _getEventsForDay,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              onDaySelected: _onDaySelected,
-              onFormatChanged: (format) {
-                if (_calendarFormat != format) {
-                  setState(() {
-                    _calendarFormat = format;
-                  });
-                }
-              },
-              onPageChanged: (focusedDay) {
-                _focusedDay = focusedDay;
-              },
-              headerStyle: const HeaderStyle(
-                titleCentered: true,
-                formatButtonVisible: false,
-                titleTextStyle:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-              ),
-              calendarStyle: CalendarStyle(
-                todayDecoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.2),
-                  shape: BoxShape.circle,
+            width: double.infinity,
+            padding: const EdgeInsets.only(top: 60, bottom: 20),
+            decoration: const BoxDecoration(
+              color: AppColors.primaryRed,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 5),
                 ),
-                selectedDecoration: const BoxDecoration(
-                  color: Colors.teal,
-                  shape: BoxShape.circle,
+              ],
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  '農曆新年', // Traditional Lunar New Year Text
+                  style: TextStyle(
+                    color: AppColors.accentGold,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Noto Serif SC',
+                    letterSpacing: 2,
+                  ),
                 ),
-                markerDecoration: const BoxDecoration(
-                  color: Colors.redAccent,
-                  shape: BoxShape.circle,
+                const SizedBox(height: 8),
+                Text(
+                  '二零二五', // Year 2025 (Snake Year)
+                  style: TextStyle(
+                    color: AppColors.accentGold.withOpacity(0.8),
+                    fontSize: 18,
+                    fontFamily: 'Noto Serif SC',
+                    letterSpacing: 4,
+                  ),
                 ),
-              ),
-              // [核心 UI] 自定义日期单元格 (使用 TymeUtil)
-              calendarBuilders: CalendarBuilders(
-                defaultBuilder: (context, day, focusedDay) {
-                  final lunar = TymeUtil.getLunarDate(day);
-                  final lunarText = TymeUtil.getLunarDayText(lunar);
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${day.day}',
-                          style: const TextStyle(fontSize: 15),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          lunarText,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[600],
-                          ),
+              ],
+            ),
+          ),
+
+          // Main Content
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+                  // Calendar "Scroll" Container
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceBeige,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.borderBeige, width: 1),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 15,
+                          offset: Offset(0, 5),
                         ),
                       ],
                     ),
-                  );
-                },
-                selectedBuilder: (context, day, focusedDay) {
-                  final lunar = TymeUtil.getLunarDate(day);
-                  final lunarText = TymeUtil.getLunarDayText(lunar);
-                  return Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.teal,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${day.day}',
-                            style: const TextStyle(
-                                fontSize: 15, color: Colors.white),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            lunarText,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.white70,
+                    padding: const EdgeInsets.all(16.0),
+                    child: TableCalendar<Event>(
+                      locale: 'zh_CN',
+                      firstDay: DateTime.utc(2010, 1, 1),
+                      lastDay: DateTime.utc(9999, 12, 31),
+                      focusedDay: _focusedDay,
+                      calendarFormat: _calendarFormat,
+                      eventLoader: _getEventsForDay,
+                      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                      onDaySelected: _onDaySelected,
+                      onFormatChanged: (format) {
+                        if (_calendarFormat != format) {
+                          setState(() {
+                            _calendarFormat = format;
+                          });
+                        }
+                      },
+                      onPageChanged: (focusedDay) {
+                        _focusedDay = focusedDay;
+                      },
+                      headerStyle: const HeaderStyle(
+                        titleCentered: true,
+                        formatButtonVisible: false,
+                        titleTextStyle: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryRed),
+                        leftChevronIcon:
+                            Icon(Icons.chevron_left, color: AppColors.primaryRed),
+                        rightChevronIcon:
+                            Icon(Icons.chevron_right, color: AppColors.primaryRed),
+                      ),
+                      calendarStyle: CalendarStyle(
+                        outsideDaysVisible: false,
+                        todayDecoration: BoxDecoration(
+                          color: Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.primaryRed, width: 1.5),
+                        ),
+                        todayTextStyle: const TextStyle(
+                            color: AppColors.primaryRed, fontWeight: FontWeight.bold),
+                        selectedDecoration: const BoxDecoration(
+                          color: AppColors.primaryRed,
+                          shape: BoxShape.circle,
+                        ),
+                        selectedTextStyle: const TextStyle(
+                            color: AppColors.accentGold, fontWeight: FontWeight.bold),
+                        markerDecoration: const BoxDecoration(
+                          color: AppColors.accentGold,
+                          shape: BoxShape.circle,
+                        ),
+                        defaultTextStyle: const TextStyle(color: AppColors.textPrimary),
+                        weekendTextStyle: const TextStyle(color: AppColors.primaryRed),
+                      ),
+                      calendarBuilders: CalendarBuilders(
+                        defaultBuilder: (context, day, focusedDay) {
+                          final lunar = TymeUtil.getLunarDate(day);
+                          final lunarText = TymeUtil.getLunarDayText(lunar);
+                          return Container(
+                            margin: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.borderBeige),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-                todayBuilder: (context, day, focusedDay) {
-                  final lunar = TymeUtil.getLunarDate(day);
-                  final lunarText = TymeUtil.getLunarDayText(lunar);
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.teal.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${day.day}',
-                            style: const TextStyle(
-                                fontSize: 15, color: Colors.teal),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            lunarText,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.teal,
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${day.day}',
+                                    style: const TextStyle(
+                                        fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    lunarText,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          // --- 事件列表 ---
-          Expanded(
-            child: ValueListenableBuilder<List<Event>>(
-              valueListenable: _selectedEvents,
-              builder: (context, value, _) {
-                // [新功能] 即使列表为空，也显示日期信息
-                if (value.isEmpty) {
-                  // [新功能] 实现请求 1: 显示完整的公历和农历年
-                  final LunarDay lunar = TymeUtil.getLunarDate(_selectedDay!);
-                  final LunarYear lunarYear =
-                      lunar.getLunarMonth().getLunarYear();
-                  final String solarDate =
-                      DateFormat.yMMMd('zh_CN').format(_selectedDay!);
-                  final String lunarDate =
-                      "${lunarYear.getName()} ${lunar.getLunarMonth().getName()}${lunar.getName()}";
-
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        '$solarDate\n$lunarDate\n\n无提醒事项',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: Colors.grey[600], fontSize: 16, height: 1.5),
-                      ),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: value.length,
-                  itemBuilder: (context, index) {
-                    final event = value[index];
-
-                    // --- [新逻辑] 开始: 构建汉化的 subtitle ---
-                    String subtitleText;
-                    if (event.isLunar) {
-                      String lunarMonthName = "";
-                      String lunarDayName = "";
-
-                      // 1. 转换月份
-                      if (event.lunarMonth != null &&
-                          event.lunarMonth! > 0 &&
-                          event.lunarMonth! <= LunarMonth.names.length) {
-                        // 使用 LunarMonth.names (0-indexed)
-                        lunarMonthName =
-                            LunarMonth.names[event.lunarMonth! - 1];
-                      } else {
-                        lunarMonthName = "${event.lunarMonth}月"; // Fallback
-                      }
-
-                      // 2. 添加 "闰"
-                      if (event.isLeapMonth) {
-                        lunarMonthName = "闰$lunarMonthName";
-                      }
-
-                      // 3. 转换日期
-                      if (event.lunarDay != null &&
-                          event.lunarDay! > 0 &&
-                          event.lunarDay! <= LunarDay.names.length) {
-                        // 使用 LunarDay.names (0-indexed)
-                        lunarDayName = LunarDay.names[event.lunarDay! - 1];
-                      } else {
-                        lunarDayName = "${event.lunarDay}日"; // Fallback
-                      }
-
-                      subtitleText =
-                          '农历: $lunarMonthName$lunarDayName ${event.isRecurring ? "(每年)" : ""}';
-                    } else {
-                      subtitleText =
-                          '公历: ${DateFormat.yMMMd('zh_CN').format(event.nextOccurrence)}';
-                    }
-                    // --- [新逻辑] 结束 ---
-
-                    return Card(
-                      elevation: 2,
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: ListTile(
-                        // [新功能] 点击列表项进行编辑
-                        onTap: () {
-                          _showAddEventDialog(eventToEdit: event);
+                          );
                         },
-                        leading: Icon(
-                          event.isLunar
-                              ? Icons.brightness_3_outlined
-                              : Icons.calendar_today,
-                          color: Colors.teal,
-                        ),
-                        title: Text(event.title,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w500)),
-                        subtitle: Text(
-                          subtitleText, // [已修改] 使用新的汉化字符串
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              color: Colors.redAccent),
-                          // [新功能] 调用删除确认
-                          onPressed: () =>
-                              _showDeleteConfirmationDialog(context, event),
-                        ),
+                        selectedBuilder: (context, day, focusedDay) {
+                          final lunar = TymeUtil.getLunarDate(day);
+                          final lunarText = TymeUtil.getLunarDayText(lunar);
+                          return Container(
+                            margin: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryRed,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.primaryRed),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primaryRed.withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                )
+                              ],
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${day.day}',
+                                    style: const TextStyle(
+                                        fontSize: 16,
+                                        color: AppColors.accentGold,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    lunarText,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.accentGold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        todayBuilder: (context, day, focusedDay) {
+                          final lunar = TymeUtil.getLunarDate(day);
+                          final lunarText = TymeUtil.getLunarDayText(lunar);
+                          return Container(
+                            margin: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.primaryRed, width: 1.5),
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${day.day}',
+                                    style: const TextStyle(
+                                        fontSize: 16,
+                                        color: AppColors.primaryRed,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    lunarText,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.primaryRed,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                );
-              },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Event List
+                  ValueListenableBuilder<List<Event>>(
+                    valueListenable: _selectedEvents,
+                    builder: (context, value, _) {
+                      if (value.isEmpty) {
+                        final LunarDay lunar = TymeUtil.getLunarDate(_selectedDay!);
+                        final LunarYear lunarYear =
+                            lunar.getLunarMonth().getLunarYear();
+                        final String solarDate =
+                            DateFormat.yMMMd('zh_CN').format(_selectedDay!);
+                        final String lunarDate =
+                            "${lunarYear.getName()} ${lunar.getLunarMonth().getName()}${lunar.getName()}";
+
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              '$solarDate\n$lunarDate\n\n无提醒事项',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 16,
+                                  height: 1.5),
+                            ),
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        shrinkWrap: true, // Important for nesting in SingleChildScrollView
+                        physics: const NeverScrollableScrollPhysics(), // Important
+                        itemCount: value.length,
+                        itemBuilder: (context, index) {
+                          final event = value[index];
+                          String subtitleText;
+                          if (event.isLunar) {
+                            String lunarMonthName = "";
+                            String lunarDayName = "";
+                            if (event.lunarMonth != null &&
+                                event.lunarMonth! > 0 &&
+                                event.lunarMonth! <= LunarMonth.names.length) {
+                              lunarMonthName =
+                                  LunarMonth.names[event.lunarMonth! - 1];
+                            } else {
+                              lunarMonthName = "${event.lunarMonth}月";
+                            }
+                            if (event.isLeapMonth) {
+                              lunarMonthName = "闰$lunarMonthName";
+                            }
+                            if (event.lunarDay != null &&
+                                event.lunarDay! > 0 &&
+                                event.lunarDay! <= LunarDay.names.length) {
+                              lunarDayName = LunarDay.names[event.lunarDay! - 1];
+                            } else {
+                              lunarDayName = "${event.lunarDay}日";
+                            }
+                            subtitleText =
+                                '农历: $lunarMonthName$lunarDayName ${event.isRecurring ? "(每年)" : ""}';
+                          } else {
+                            subtitleText =
+                                '公历: ${DateFormat.yMMMd('zh_CN').format(event.nextOccurrence)}';
+                          }
+
+                          return Card(
+                            elevation: 2,
+                            margin: const EdgeInsets.symmetric(vertical: 6),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            child: ListTile(
+                              onTap: () {
+                                _showAddEventDialog(eventToEdit: event);
+                              },
+                              leading: Icon(
+                                event.isLunar
+                                    ? Icons.brightness_3_outlined
+                                    : Icons.calendar_today,
+                                color: AppColors.primaryRed,
+                              ),
+                              title: Text(event.title,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary)),
+                              subtitle: Text(
+                                subtitleText,
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline,
+                                    color: Colors.redAccent),
+                                onPressed: () =>
+                                    _showDeleteConfirmationDialog(context, event),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 80), // Bottom padding
+                ],
+              ),
             ),
           ),
         ],
@@ -959,7 +1036,11 @@ class _AddEventSheetState extends State<AddEventSheet> {
                       _isLunar = true;
                     });
                   },
-                  selectedColor: Colors.teal.withOpacity(0.2),
+                  selectedColor: AppColors.primaryRed.withOpacity(0.2),
+                  labelStyle: TextStyle(
+                    color: _isLunar ? AppColors.primaryRed : AppColors.textPrimary,
+                    fontWeight: _isLunar ? FontWeight.bold : FontWeight.normal,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 ChoiceChip(
@@ -970,7 +1051,11 @@ class _AddEventSheetState extends State<AddEventSheet> {
                       _isLunar = false;
                     });
                   },
-                  selectedColor: Colors.teal.withOpacity(0.2),
+                  selectedColor: AppColors.primaryRed.withOpacity(0.2),
+                  labelStyle: TextStyle(
+                    color: !_isLunar ? AppColors.primaryRed : AppColors.textPrimary,
+                    fontWeight: !_isLunar ? FontWeight.bold : FontWeight.normal,
+                  ),
                 ),
               ],
             ),
@@ -1018,7 +1103,7 @@ class _AddEventSheetState extends State<AddEventSheet> {
                     _isLeapMonth = value!;
                   });
                 },
-                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: AppColors.primaryRed,
                 contentPadding: EdgeInsets.zero,
               ),
 
@@ -1031,6 +1116,7 @@ class _AddEventSheetState extends State<AddEventSheet> {
                   _isRecurring = value!;
                 });
               },
+              activeColor: AppColors.primaryRed,
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
             ),
@@ -1041,8 +1127,8 @@ class _AddEventSheetState extends State<AddEventSheet> {
               child: ElevatedButton(
                 onPressed: _saveEvent,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.primaryRed,
+                  foregroundColor: AppColors.accentGold,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
