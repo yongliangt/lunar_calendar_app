@@ -14,28 +14,65 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'theme.dart'; // Import the new theme file
 
 // --- 数据模型 ---
+// 重复类型枚举
+enum RecurrenceType {
+  none,      // 不重复
+  daily,     // 每天
+  weekly,    // 每星期
+  monthly,   // 每月
+  yearly,    // 每年
+  custom,    // 自定义
+}
+
+// 辅助扩展：获取重复类型的中文名称
+extension RecurrenceTypeExtension on RecurrenceType {
+  String get displayName {
+    switch (this) {
+      case RecurrenceType.none:
+        return '不重复';
+      case RecurrenceType.daily:
+        return '每天';
+      case RecurrenceType.weekly:
+        return '每星期';
+      case RecurrenceType.monthly:
+        return '每月';
+      case RecurrenceType.yearly:
+        return '每年';
+      case RecurrenceType.custom:
+        return '自定义';
+    }
+  }
+}
+
 // Event 模型用于存储事件数据
 class Event {
   String id;
   String title;
+  String? description; // 事件描述/备注
   DateTime nextOccurrence; // 此事件下一次发生的 *公历* 日期
   bool isLunar;
   int? lunarYear;
   int? lunarMonth;
   int? lunarDay;
   bool isLeapMonth; // 是否为闰月
-  bool isRecurring;
+  RecurrenceType recurrenceType; // 重复类型
+  int? customIntervalDays; // 自定义间隔天数（仅当 recurrenceType == custom 时使用）
+
+  // 为了保持兼容性，提供 isRecurring getter
+  bool get isRecurring => recurrenceType != RecurrenceType.none;
 
   Event({
     required this.id,
     required this.title,
+    this.description,
     required this.nextOccurrence,
     required this.isLunar,
     this.lunarYear,
     this.lunarMonth,
     this.lunarDay,
     this.isLeapMonth = false,
-    required this.isRecurring,
+    this.recurrenceType = RecurrenceType.yearly,
+    this.customIntervalDays,
   });
 
   // 用于 Hive 存储（JSON 序列化）
@@ -43,28 +80,48 @@ class Event {
     return {
       'id': id,
       'title': title,
+      'description': description,
       'nextOccurrence': nextOccurrence.toIso8601String(),
       'isLunar': isLunar,
       'lunarYear': lunarYear,
       'lunarMonth': lunarMonth,
       'lunarDay': lunarDay,
       'isLeapMonth': isLeapMonth,
-      'isRecurring': isRecurring,
+      'recurrenceType': recurrenceType.name,
+      'customIntervalDays': customIntervalDays,
     };
   }
 
   // 从 JSON 反序列化
   factory Event.fromJson(Map<String, dynamic> json) {
+    // 向后兼容：处理旧的 isRecurring 字段
+    RecurrenceType recurrence;
+    if (json.containsKey('recurrenceType') && json['recurrenceType'] != null) {
+      recurrence = RecurrenceType.values.firstWhere(
+        (e) => e.name == json['recurrenceType'],
+        orElse: () => RecurrenceType.yearly,
+      );
+    } else if (json.containsKey('isRecurring')) {
+      // 旧数据迁移：isRecurring == true 转换为 yearly
+      recurrence = json['isRecurring'] == true 
+          ? RecurrenceType.yearly 
+          : RecurrenceType.none;
+    } else {
+      recurrence = RecurrenceType.yearly;
+    }
+
     return Event(
       id: json['id'],
       title: json['title'],
+      description: json['description'],
       nextOccurrence: DateTime.parse(json['nextOccurrence']),
       isLunar: json['isLunar'],
       lunarYear: json['lunarYear'],
       lunarMonth: json['lunarMonth'],
       lunarDay: json['lunarDay'],
       isLeapMonth: json['isLeapMonth'],
-      isRecurring: json['isRecurring'],
+      recurrenceType: recurrence,
+      customIntervalDays: json['customIntervalDays'],
     );
   }
 }
@@ -118,10 +175,11 @@ class NotificationService {
   Future<void> scheduleNotification(Event event) async {
     // Web 平台使用 console.log 模拟通知
     if (kIsWeb) {
-      print('--- [WEB 提醒 STUB] ---');
-      print('标题: ${event.title}');
-      print('提醒时间 (公历): ${event.nextOccurrence}');
-      print('-------------------------');
+      // Web 平台不支持原生通知，使用 debugPrint 记录日志
+      debugPrint('--- [WEB 提醒 STUB] ---');
+      debugPrint('标题: ${event.title}');
+      debugPrint('提醒时间 (公历): ${event.nextOccurrence}');
+      debugPrint('-------------------------');
       return;
     }
 
@@ -489,6 +547,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _loadAllEvents();
     _selectedEvents.value = _getEventsForDay(_selectedDay!);
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text('"${event.title}" 已删除'),
@@ -507,42 +566,162 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
       body: Column(
         children: [
-          // Custom Header
+          // Custom Header with Beautiful Design
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(top: 60, bottom: 20),
-            decoration: const BoxDecoration(
-              color: AppColors.primaryRed,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+            padding: const EdgeInsets.only(top: 50, bottom: 24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF8B0000), // Dark red at top
+                  AppColors.primaryRed, // Primary red
+                  Color(0xFFCC2929), // Lighter red at bottom
+                ],
+              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 10,
-                  offset: Offset(0, 5),
+                  color: AppColors.primaryRed.withValues(alpha: 0.4),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Column(
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                const Text(
-                  '農曆新年', // Traditional Lunar New Year Text
-                  style: TextStyle(
-                    color: AppColors.accentGold,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Noto Serif SC',
-                    letterSpacing: 2,
+                // Decorative corner patterns (top-left)
+                Positioned(
+                  top: 10,
+                  left: 20,
+                  child: Icon(
+                    Icons.auto_awesome,
+                    color: AppColors.accentGold.withValues(alpha: 0.3),
+                    size: 28,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '二零二五', // Year 2025 (Snake Year)
-                  style: TextStyle(
-                    color: AppColors.accentGold.withOpacity(0.8),
-                    fontSize: 18,
-                    fontFamily: 'Noto Serif SC',
-                    letterSpacing: 4,
+                // Decorative corner patterns (top-right)
+                Positioned(
+                  top: 10,
+                  right: 20,
+                  child: Icon(
+                    Icons.auto_awesome,
+                    color: AppColors.accentGold.withValues(alpha: 0.3),
+                    size: 28,
                   ),
+                ),
+                // Decorative swirls (left)
+                Positioned(
+                  left: 16,
+                  bottom: 20,
+                  child: Text(
+                    '༄',
+                    style: TextStyle(
+                      color: AppColors.accentGold.withValues(alpha: 0.4),
+                      fontSize: 36,
+                    ),
+                  ),
+                ),
+                // Decorative swirls (right)
+                Positioned(
+                  right: 16,
+                  bottom: 20,
+                  child: Text(
+                    '༄',
+                    style: TextStyle(
+                      color: AppColors.accentGold.withValues(alpha: 0.4),
+                      fontSize: 36,
+                    ),
+                  ),
+                ),
+                // Main content
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Golden decorative line above title
+                    Container(
+                      width: 60,
+                      height: 2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.accentGold.withValues(alpha: 0),
+                            AppColors.accentGold,
+                            AppColors.accentGold.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Title with shadow
+                    const Text(
+                      '農曆日曆',
+                      style: TextStyle(
+                        color: AppColors.accentGold,
+                        fontSize: 34,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Noto Serif SC',
+                        letterSpacing: 6,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black38,
+                            offset: Offset(2, 2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Year with decorative brackets
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '【 ',
+                          style: TextStyle(
+                            color: AppColors.accentGold.withValues(alpha: 0.6),
+                            fontSize: 18,
+                            fontFamily: 'Noto Serif SC',
+                          ),
+                        ),
+                        Text(
+                          TymeUtil.getLunarDate(_focusedDay).getLunarMonth().getLunarYear().getName(),
+                          style: const TextStyle(
+                            color: AppColors.accentGold,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Noto Serif SC',
+                            letterSpacing: 3,
+                          ),
+                        ),
+                        Text(
+                          ' 】',
+                          style: TextStyle(
+                            color: AppColors.accentGold.withValues(alpha: 0.6),
+                            fontSize: 18,
+                            fontFamily: 'Noto Serif SC',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Golden decorative line below
+                    Container(
+                      width: 100,
+                      height: 2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.accentGold.withValues(alpha: 0),
+                            AppColors.accentGold,
+                            AppColors.accentGold.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -665,7 +844,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               border: Border.all(color: AppColors.primaryRed),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryRed.withOpacity(0.3),
+                                  color: AppColors.primaryRed.withValues(alpha: 0.3),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 )
@@ -788,11 +967,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             } else {
                               lunarDayName = "${event.lunarDay}日";
                             }
+                            // 生成重复类型显示文本
+                            String recurrenceText = '';
+                            if (event.recurrenceType != RecurrenceType.none) {
+                              if (event.recurrenceType == RecurrenceType.custom && 
+                                  event.customIntervalDays != null) {
+                                recurrenceText = '(每${event.customIntervalDays}天)';
+                              } else {
+                                recurrenceText = '(${event.recurrenceType.displayName})';
+                              }
+                            }
                             subtitleText =
-                                '农历: $lunarMonthName$lunarDayName ${event.isRecurring ? "(每年)" : ""}';
+                                '农历: $lunarMonthName$lunarDayName $recurrenceText';
                           } else {
+                            // 生成公历重复类型显示文本
+                            String recurrenceText = '';
+                            if (event.recurrenceType != RecurrenceType.none) {
+                              if (event.recurrenceType == RecurrenceType.custom && 
+                                  event.customIntervalDays != null) {
+                                recurrenceText = ' (每${event.customIntervalDays}天)';
+                              } else {
+                                recurrenceText = ' (${event.recurrenceType.displayName})';
+                              }
+                            }
                             subtitleText =
-                                '公历: ${DateFormat.yMMMd('zh_CN').format(event.nextOccurrence)}';
+                                '公历: ${DateFormat.yMMMd('zh_CN').format(event.nextOccurrence)}$recurrenceText';
                           }
 
                           return Card(
@@ -859,18 +1058,21 @@ class AddEventSheet extends StatefulWidget {
 
 class _AddEventSheetState extends State<AddEventSheet> {
   final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _customDaysController = TextEditingController();
   late bool _isLunar;
-  late bool _isRecurring;
-  late bool _isLeapMonth;
+  RecurrenceType _recurrenceType = RecurrenceType.yearly;
+  int? _customIntervalDays;
+  bool _isLeapMonth = false;
   bool _currentDayHasLeapMonth = false;
   late bool _isEditing;
 
   // [新] 状态变量，用于存储当前表单的日期
   late DateTime _date;
-  late int _lunarYear;
+  int _lunarYear = 0;
   late LunarDay _lunarInfo;
-  late int _lunarMonth;
-  late int _lunarDay;
+  int _lunarMonth = 0;
+  int _lunarDay = 0;
 
   @override
   void initState() {
@@ -881,8 +1083,13 @@ class _AddEventSheetState extends State<AddEventSheet> {
       // --- 编辑模式 ---
       final event = widget.eventToEdit!;
       _titleController.text = event.title;
+      _descriptionController.text = event.description ?? '';
       _isLunar = event.isLunar;
-      _isRecurring = event.isRecurring;
+      _recurrenceType = event.recurrenceType;
+      _customIntervalDays = event.customIntervalDays;
+      if (_customIntervalDays != null) {
+        _customDaysController.text = _customIntervalDays.toString();
+      }
       _isLeapMonth = event.isLeapMonth;
 
       // [新] 使用事件的下次发生日期作为基础
@@ -890,6 +1097,7 @@ class _AddEventSheetState extends State<AddEventSheet> {
       // TymeUtil.getLunarDate 会正确处理它以获取 *当前* 的农历信息
       _date = event.nextOccurrence;
       _lunarInfo = TymeUtil.getLunarDate(_date);
+      _lunarYear = _lunarInfo.getLunarMonth().getLunarYear().getYear();
 
       if (_isLunar) {
         // 从 *已保存* 的事件数据中加载农历信息
@@ -897,12 +1105,17 @@ class _AddEventSheetState extends State<AddEventSheet> {
         _lunarDay = event.lunarDay!;
         // 检查 *当前* 选中的日期是否是闰月，以决定是否显示 Checkbox
         _currentDayHasLeapMonth = _lunarInfo.getLunarMonth().isLeap();
+      } else {
+        // 公历事件也需要初始化农历信息（用于显示）
+        _lunarMonth = _lunarInfo.getLunarMonth().getMonth();
+        _lunarDay = _lunarInfo.getDay();
       }
     } else {
       // --- 新增模式 ---
       _date = widget.selectedDate!;
       _isLunar = true; // 新事件默认是农历
-      _isRecurring = true; // 默认为true
+      _recurrenceType = RecurrenceType.yearly; // 默认为每年
+      _customIntervalDays = null;
       _updateLunarInfo(_date); // 使用日历选中的日期初始化
     }
   }
@@ -931,6 +1144,8 @@ class _AddEventSheetState extends State<AddEventSheet> {
   @override
   void dispose() {
     _titleController.dispose();
+    _descriptionController.dispose();
+    _customDaysController.dispose();
     super.dispose();
   }
 
@@ -952,8 +1167,23 @@ class _AddEventSheetState extends State<AddEventSheet> {
     final title = _titleController.text;
     if (title.isEmpty) return;
 
+    // 如果选择了自定义，解析自定义天数
+    int? customDays;
+    if (_recurrenceType == RecurrenceType.custom) {
+      customDays = int.tryParse(_customDaysController.text);
+      if (customDays == null || customDays <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请输入有效的自定义天数')),
+        );
+        return;
+      }
+    }
+
     // [新] 编辑时使用旧 ID，新增时使用新 ID
     final String eventId = widget.eventToEdit?.id ?? kUuid.v4();
+    final String? description = _descriptionController.text.isNotEmpty 
+        ? _descriptionController.text 
+        : null;
     Event newEvent;
 
     if (_isLunar) {
@@ -970,22 +1200,26 @@ class _AddEventSheetState extends State<AddEventSheet> {
       newEvent = Event(
         id: eventId,
         title: title,
+        description: description,
         nextOccurrence: nextOccurrence,
         isLunar: true,
         lunarYear: _lunarYear,
         lunarMonth: _lunarMonth,
         lunarDay: _lunarDay,
         isLeapMonth: _isLeapMonth, // 用户是否指定为闰月
-        isRecurring: _isRecurring,
+        recurrenceType: _recurrenceType,
+        customIntervalDays: customDays,
       );
     } else {
       // 保存公历事件
       newEvent = Event(
         id: eventId,
         title: title,
+        description: description,
         nextOccurrence: _date, // 使用状态中的公历日期
         isLunar: false,
-        isRecurring: _isRecurring,
+        recurrenceType: _recurrenceType,
+        customIntervalDays: customDays,
       );
     }
 
@@ -1008,11 +1242,24 @@ class _AddEventSheetState extends State<AddEventSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _isEditing ? '编辑提醒事项' : '添加提醒事项',
-              style: Theme.of(context).textTheme.headlineSmall,
+            // 标题行带关闭按钮
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _isEditing ? '编辑提醒事项' : '添加提醒事项',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                  tooltip: '取消',
+                  style: IconButton.styleFrom(
+                    foregroundColor: Colors.grey[600],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
             TextField(
               controller: _titleController,
               decoration: InputDecoration(
@@ -1022,6 +1269,20 @@ class _AddEventSheetState extends State<AddEventSheet> {
                 ),
               ),
               autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            // 事件描述/备注
+            TextField(
+              controller: _descriptionController,
+              decoration: InputDecoration(
+                labelText: '备注（可选）',
+                hintText: '添加更多详细信息...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              maxLines: 3,
+              minLines: 2,
             ),
             const SizedBox(height: 12),
             // 农历/公历 切换
@@ -1036,7 +1297,7 @@ class _AddEventSheetState extends State<AddEventSheet> {
                       _isLunar = true;
                     });
                   },
-                  selectedColor: AppColors.primaryRed.withOpacity(0.2),
+                  selectedColor: AppColors.primaryRed.withValues(alpha: 0.2),
                   labelStyle: TextStyle(
                     color: _isLunar ? AppColors.primaryRed : AppColors.textPrimary,
                     fontWeight: _isLunar ? FontWeight.bold : FontWeight.normal,
@@ -1051,7 +1312,7 @@ class _AddEventSheetState extends State<AddEventSheet> {
                       _isLunar = false;
                     });
                   },
-                  selectedColor: AppColors.primaryRed.withOpacity(0.2),
+                  selectedColor: AppColors.primaryRed.withValues(alpha: 0.2),
                   labelStyle: TextStyle(
                     color: !_isLunar ? AppColors.primaryRed : AppColors.textPrimary,
                     fontWeight: !_isLunar ? FontWeight.bold : FontWeight.normal,
@@ -1107,19 +1368,66 @@ class _AddEventSheetState extends State<AddEventSheet> {
                 contentPadding: EdgeInsets.zero,
               ),
 
-            // 每年提醒
-            CheckboxListTile(
-              title: const Text('每年提醒'),
-              value: _isRecurring,
-              onChanged: (value) {
-                setState(() {
-                  _isRecurring = value!;
-                });
-              },
-              activeColor: AppColors.primaryRed,
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
+            // 重复类型选择
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text(
+                  '重复：',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.borderBeige),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<RecurrenceType>(
+                        value: _recurrenceType,
+                        isExpanded: true,
+                        icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryRed),
+                        items: RecurrenceType.values.map((type) {
+                          return DropdownMenuItem<RecurrenceType>(
+                            value: type,
+                            child: Text(
+                              type.displayName,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _recurrenceType = value;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+
+            // 自定义天数输入（仅当选择"自定义"时显示）
+            if (_recurrenceType == RecurrenceType.custom) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _customDaysController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: '每隔几天重复',
+                  hintText: '例如：7 表示每7天重复一次',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  suffixText: '天',
+                ),
+              ),
+            ],
 
             const SizedBox(height: 20),
             SizedBox(
