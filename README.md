@@ -1,64 +1,137 @@
-农历提醒日历 Flutter 项目
+# 農曆日曆 (Lunar Calendar App)
 
-这是一个Flutter入门项目，用于演示如何构建一个支持农历提醒的日历应用。
+一款精美的 Flutter 农历日历应用，支持农历/公历事件提醒，具有传统中国风格的用户界面设计。
 
-文件保存位置
+## ✨ 功能特点
 
-这是一个标准的Flutter项目结构。您应该按如下方式组织文件：
+### 📅 日历功能
+- 支持农历和公历双日历显示
+- 可视化日期选择，每个日期显示对应的农历日期
+- **周末高亮** - 周六和周日以红色显示，区别于工作日
+- 流畅的月份切换和日期导航动画
+- **快速跳转** - 点击月份标题可快速选择年月进行跳转
+- **返回今天** - 导航到其他月份时，显示"返回今天"按钮，一键返回当前日期
 
-pubspec.yaml:
+### 🔔 事件提醒
+- **农历提醒**: 根据农历日期设置提醒（如生日、传统节日）
+- **公历提醒**: 根据公历日期设置提醒
+- **闰月支持**: 自动识别并支持闰月日期的提醒设置
 
-位置: 项目的根目录 (/pubspec.yaml)。
+### 🔄 灵活的重复选项
+- 不重复 - 一次性事件
+- 每天 - 每日重复
+- 每星期 - 每周重复
+- 每月 - 每月重复
+- 每年 - 每年重复（适合生日、纪念日）
+- 自定义 - 自定义间隔天数
 
-内容: 包含所有Flutter和Dart的依赖项，如 table_calendar, hive, flutter_local_notifications 等。
+### 📝 事件管理
+- 事件标题和详细描述/备注
+- 编辑和删除现有事件
+- 本地通知提醒
+- 便捷的关闭按钮
 
-main.dart:
+### 🎨 精美设计
+- 传统中国红金配色主题
+- 优雅的渐变和阴影效果
+- 流畅的动画和过渡效果
+- 周末日期红色高亮显示
 
-位置: lib/ 文件夹 (/lib/main.dart)。
+## 📁 项目结构
 
-内容: 这是应用的主入口点。为方便演示，所有的Dart代码（包括模型、服务和UI屏幕）都已合并到这一个文件中。
+```
+lunar_calendar_app/
+├── lib/
+│   ├── main.dart          # 主入口点，包含所有核心代码
+│   └── theme.dart         # 主题配置文件
+├── android/
+│   └── app/
+│       ├── build.gradle   # Android 构建配置
+│       └── src/main/
+│           └── AndroidManifest.xml  # Android 权限配置
+├── pubspec.yaml           # Flutter 依赖配置
+└── README.md              # 项目说明文档
+```
 
-build.gradle:
+## 🛠️ 技术栈
 
-位置: Android特定的配置，位于 android/app/ 文件夹 (/android/app/build.gradle)。
+- **Flutter** - 跨平台 UI 框架
+- **Hive** - 轻量级本地数据库
+- **table_calendar** - 日历组件
+- **flutter_local_notifications** - 本地通知
+- **tyme** - 农历日期计算库
+- **intl** - 国际化和日期格式化
 
-内容: 在这个文件中，compileSdkVersion 和 targetSdkVersion 已被设置为 35，以确保与 Android 15 兼容。
+## 🚀 快速开始
 
-AndroidManifest.xml:
-
-位置: Android特定的清单文件，位于 android/app/src/main/ 文件夹 (/android/app/src/main/AndroidManifest.xml)。
-
-内容: 添加了必要的权限，特别是 POST_NOTIFICATIONS (Android 13+) 和 SCHEDULE_EXACT_ALARM (Android 14+)，这对于提醒功能至关重要。
-
-README.md (本文件):
-
-位置: 项目的根目录 (/README.md)。
-
-如何运行
-
-创建项目:
-
+### 1. 创建项目
+```bash
 flutter create lunar_calendar_app
+cd lunar_calendar_app
+```
 
-
-替换文件:
-
-将您新创建的 lunar_calendar_app 文件夹中的 pubspec.yaml 替换为上面提供的 pubspec.yaml。
-
-进入 lib/ 目录，将 main.dart 替换为上面提供的 main.dart。
-
-进入 android/app/ 目录，将 build.gradle 替换为上面提供的 build.gradle。
-
-进入 android/app/src/main/ 目录，将 AndroidManifest.xml 替换为上面提供的 AndroidManifest.xml。
-
-获取依赖:
-
+### 2. 获取依赖
+```bash
 flutter pub get
+```
 
-
-运行应用:
-
+### 3. 运行应用
+```bash
 flutter run
+```
 
+## ⚙️ Android 配置
 
-重要提示: 此代码使用 Hive 数据库。在您第一次运行应用时，如果遇到 HiveBox 未打开的错误，请完全停止应用并重新启动它。
+确保以下配置已正确设置：
+
+- `compileSdkVersion`: 35
+- `targetSdkVersion`: 35
+
+### 必要权限 (AndroidManifest.xml)
+- `POST_NOTIFICATIONS` - Android 13+ 通知权限
+- `SCHEDULE_EXACT_ALARM` - Android 14+ 精确闹钟权限
+
+## 📱 支持平台
+
+- ✅ Android
+- ✅ iOS
+- ✅ Web
+- ✅ macOS
+- ✅ Windows
+- ✅ Linux
+
+## 🎯 使用指南
+
+### 日历导航
+- **左右滑动** 或点击 **箭头** 切换月份
+- **点击月份标题**（如"2026年1月"）打开年月选择器快速跳转
+- **点击金色"今天"按钮** 快速返回当前日期（仅在非当前月份时显示）
+
+### 添加提醒
+1. 点击右下角的 **"+"** 按钮
+2. 输入事件标题和备注（可选）
+3. 选择 **农历** 或 **公历**
+4. 选择重复频率（不重复、每天、每星期、每月、每年、自定义）
+5. 点击 **保存**
+
+### 编辑/删除提醒
+- **点击事件** 进入编辑模式
+- 点击 **删除图标** 删除事件
+
+## ⚠️ 注意事项
+
+1. **Hive 数据库**: 首次运行时如遇到 HiveBox 未打开的错误，请完全停止应用并重新启动。
+
+2. **通知权限**: Android 13 及以上版本需要用户手动授予通知权限。
+
+3. **农历计算**: 农历日期由 `tyme` 库计算，支持准确的农历月份和闰月判断。
+
+4. **数据存储**: 数据存储在本地浏览器/设备中，不同设备间不会同步。
+
+## 📄 许可证
+
+MIT License
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！

@@ -555,14 +555,167 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  // [新功能] 显示年月选择器
+  void _showYearMonthPicker() {
+    int selectedYear = _focusedDay.year;
+    int selectedMonth = _focusedDay.month;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text(
+                '选择年月',
+                style: TextStyle(
+                  color: AppColors.primaryRed,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 年份选择
+                  Row(
+                    children: [
+                      const Text('年份：', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.borderBeige),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              value: selectedYear,
+                              isExpanded: true,
+                              items: List.generate(100, (index) => 2000 + index)
+                                  .map((year) => DropdownMenuItem<int>(
+                                        value: year,
+                                        child: Text('$year年'),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setDialogState(() {
+                                    selectedYear = value;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // 月份选择
+                  Row(
+                    children: [
+                      const Text('月份：', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.borderBeige),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              value: selectedMonth,
+                              isExpanded: true,
+                              items: List.generate(12, (index) => index + 1)
+                                  .map((month) => DropdownMenuItem<int>(
+                                        value: month,
+                                        child: Text('$month月'),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setDialogState(() {
+                                    selectedMonth = value;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('取消'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _focusedDay = DateTime(selectedYear, selectedMonth, 1);
+                      _selectedDay = _focusedDay;
+                      _selectedEvents.value = _getEventsForDay(_selectedDay!);
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryRed,
+                    foregroundColor: AppColors.accentGold,
+                  ),
+                  child: const Text('确定'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   @override
   Widget build(BuildContext context) {
+    // 检查是否在当前月份
+    final now = DateTime.now();
+    final isCurrentMonth = _focusedDay.year == now.year && 
+                           _focusedDay.month == now.month;
+    
     return Scaffold(
       backgroundColor: AppColors.backgroundBeige,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddEventDialog,
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // "返回今天" 按钮 - 仅当不在当前月份时显示
+          if (!isCurrentMonth)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: FloatingActionButton(
+                heroTag: 'today_btn',
+                onPressed: () {
+                  setState(() {
+                    _focusedDay = DateTime.now();
+                    _selectedDay = _focusedDay;
+                    _selectedEvents.value = _getEventsForDay(_selectedDay!);
+                  });
+                },
+                backgroundColor: AppColors.accentGold,
+                foregroundColor: AppColors.primaryRed,
+                tooltip: '返回今天',
+                child: const Icon(Icons.today),
+              ),
+            ),
+          // 添加事件按钮
+          FloatingActionButton(
+            heroTag: 'add_btn',
+            onPressed: _showAddEventDialog,
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -766,15 +919,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         }
                       },
                       onPageChanged: (focusedDay) {
+                        final oldMonth = DateTime(_focusedDay.year, _focusedDay.month);
                         _focusedDay = focusedDay;
+                        final newMonth = DateTime(focusedDay.year, focusedDay.month);
+                        // Rebuild after animation to update Today button and header
+                        // Use post-frame callback to avoid animation interruption
+                        if (oldMonth != newMonth) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) setState(() {});
+                          });
+                        }
                       },
+                      onHeaderTapped: (_) => _showYearMonthPicker(),
                       headerStyle: const HeaderStyle(
                         titleCentered: true,
                         formatButtonVisible: false,
                         titleTextStyle: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.primaryRed),
+                            color: AppColors.primaryRed,
+                            decoration: TextDecoration.underline,
+                            decorationColor: AppColors.primaryRed,
+                            decorationStyle: TextDecorationStyle.dotted),
                         leftChevronIcon:
                             Icon(Icons.chevron_left, color: AppColors.primaryRed),
                         rightChevronIcon:
@@ -806,11 +972,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         defaultBuilder: (context, day, focusedDay) {
                           final lunar = TymeUtil.getLunarDate(day);
                           final lunarText = TymeUtil.getLunarDayText(lunar);
+                          final isWeekend = day.weekday == DateTime.saturday || 
+                                           day.weekday == DateTime.sunday;
                           return Container(
                             margin: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.borderBeige),
+                              border: Border.all(
+                                color: isWeekend 
+                                    ? AppColors.primaryRed.withValues(alpha: 0.3) 
+                                    : AppColors.borderBeige,
+                              ),
                               borderRadius: BorderRadius.circular(8),
+                              color: isWeekend 
+                                  ? AppColors.primaryRed.withValues(alpha: 0.05) 
+                                  : null,
                             ),
                             child: Center(
                               child: Column(
@@ -818,14 +993,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 children: [
                                   Text(
                                     '${day.day}',
-                                    style: const TextStyle(
-                                        fontSize: 16, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                        fontSize: 16, 
+                                        fontWeight: FontWeight.bold,
+                                        color: isWeekend 
+                                            ? AppColors.primaryRed 
+                                            : AppColors.textPrimary),
                                   ),
                                   Text(
                                     lunarText,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.grey[600],
+                                      color: isWeekend 
+                                          ? AppColors.primaryRed.withValues(alpha: 0.7) 
+                                          : Colors.grey[600],
                                     ),
                                   ),
                                 ],
