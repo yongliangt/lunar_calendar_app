@@ -44,6 +44,74 @@ extension RecurrenceTypeExtension on RecurrenceType {
   }
 }
 
+// 通知提前时间枚举
+enum NotificationTiming {
+  none,         // 不提醒
+  atTime,       // 准时
+  min15Before,  // 15分钟前
+  min30Before,  // 30分钟前
+  hour1Before,  // 1小时前
+  hour2Before,  // 2小时前
+  day1Before,   // 1天前
+  day3Before,   // 3天前
+  week1Before,  // 1周前
+  custom,       // 自定义
+}
+
+// 辅助扩展：获取通知时间的中文名称和分钟数
+extension NotificationTimingExtension on NotificationTiming {
+  String get displayName {
+    switch (this) {
+      case NotificationTiming.none:
+        return '不提醒';
+      case NotificationTiming.atTime:
+        return '准时';
+      case NotificationTiming.min15Before:
+        return '15分钟前';
+      case NotificationTiming.min30Before:
+        return '30分钟前';
+      case NotificationTiming.hour1Before:
+        return '1小时前';
+      case NotificationTiming.hour2Before:
+        return '2小时前';
+      case NotificationTiming.day1Before:
+        return '1天前';
+      case NotificationTiming.day3Before:
+        return '3天前';
+      case NotificationTiming.week1Before:
+        return '1周前';
+      case NotificationTiming.custom:
+        return '自定义';
+    }
+  }
+
+  // 获取提前的分钟数（用于计算通知时间）
+  int get minutesBefore {
+    switch (this) {
+      case NotificationTiming.none:
+        return -1; // 表示不提醒
+      case NotificationTiming.atTime:
+        return 0;
+      case NotificationTiming.min15Before:
+        return 15;
+      case NotificationTiming.min30Before:
+        return 30;
+      case NotificationTiming.hour1Before:
+        return 60;
+      case NotificationTiming.hour2Before:
+        return 120;
+      case NotificationTiming.day1Before:
+        return 1440; // 24 * 60
+      case NotificationTiming.day3Before:
+        return 4320; // 3 * 24 * 60
+      case NotificationTiming.week1Before:
+        return 10080; // 7 * 24 * 60
+      case NotificationTiming.custom:
+        return 0; // 自定义需要单独处理
+    }
+  }
+}
+
 // Event 模型用于存储事件数据
 class Event {
   String id;
@@ -57,9 +125,19 @@ class Event {
   bool isLeapMonth; // 是否为闰月
   RecurrenceType recurrenceType; // 重复类型
   int? customIntervalDays; // 自定义间隔天数（仅当 recurrenceType == custom 时使用）
+  NotificationTiming notificationTiming; // 通知提前时间
+  int? customNotificationMinutes; // 自定义通知提前分钟数
 
   // 为了保持兼容性，提供 isRecurring getter
   bool get isRecurring => recurrenceType != RecurrenceType.none;
+
+  // 获取实际的通知提前分钟数
+  int get notificationMinutesBefore {
+    if (notificationTiming == NotificationTiming.custom) {
+      return customNotificationMinutes ?? 0;
+    }
+    return notificationTiming.minutesBefore;
+  }
 
   Event({
     required this.id,
@@ -73,6 +151,8 @@ class Event {
     this.isLeapMonth = false,
     this.recurrenceType = RecurrenceType.yearly,
     this.customIntervalDays,
+    this.notificationTiming = NotificationTiming.atTime,
+    this.customNotificationMinutes,
   });
 
   // 用于 Hive 存储（JSON 序列化）
@@ -89,6 +169,8 @@ class Event {
       'isLeapMonth': isLeapMonth,
       'recurrenceType': recurrenceType.name,
       'customIntervalDays': customIntervalDays,
+      'notificationTiming': notificationTiming.name,
+      'customNotificationMinutes': customNotificationMinutes,
     };
   }
 
@@ -110,6 +192,15 @@ class Event {
       recurrence = RecurrenceType.yearly;
     }
 
+    // 向后兼容：处理通知时间
+    NotificationTiming timing = NotificationTiming.atTime;
+    if (json.containsKey('notificationTiming') && json['notificationTiming'] != null) {
+      timing = NotificationTiming.values.firstWhere(
+        (e) => e.name == json['notificationTiming'],
+        orElse: () => NotificationTiming.atTime,
+      );
+    }
+
     return Event(
       id: json['id'],
       title: json['title'],
@@ -122,6 +213,8 @@ class Event {
       isLeapMonth: json['isLeapMonth'],
       recurrenceType: recurrence,
       customIntervalDays: json['customIntervalDays'],
+      notificationTiming: timing,
+      customNotificationMinutes: json['customNotificationMinutes'],
     );
   }
 }
@@ -173,12 +266,18 @@ class NotificationService {
   }
 
   Future<void> scheduleNotification(Event event) async {
+    // 如果选择了不提醒，直接返回
+    if (event.notificationTiming == NotificationTiming.none) {
+      return;
+    }
+
     // Web 平台使用 console.log 模拟通知
     if (kIsWeb) {
       // Web 平台不支持原生通知，使用 debugPrint 记录日志
       debugPrint('--- [WEB 提醒 STUB] ---');
       debugPrint('标题: ${event.title}');
       debugPrint('提醒时间 (公历): ${event.nextOccurrence}');
+      debugPrint('提前分钟: ${event.notificationMinutesBefore}');
       debugPrint('-------------------------');
       return;
     }
@@ -196,25 +295,109 @@ class NotificationService {
     const NotificationDetails details =
         NotificationDetails(android: androidDetails);
 
-    // 确保使用本地时区
-    final tz.TZDateTime scheduledDate =
-        tz.TZDateTime.from(event.nextOccurrence, tz.local);
-
-    await _plugin.zonedSchedule(
-      event.id.hashCode,
-      '日历提醒',
-      event.title,
-      scheduledDate,
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+    // 计算提醒时间（根据设置的提前时间）
+    final int minutesBefore = event.notificationMinutesBefore;
+    final DateTime notifyTime = event.nextOccurrence.subtract(
+      Duration(minutes: minutesBefore),
     );
+
+    // 确保使用本地时区
+    final tz.TZDateTime scheduledDate = tz.TZDateTime.from(notifyTime, tz.local);
+
+    // 只有当提醒时间在未来时才调度
+    if (scheduledDate.isAfter(tz.TZDateTime.now(tz.local))) {
+      await _plugin.zonedSchedule(
+        event.id.hashCode,
+        '日历提醒',
+        event.title,
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    }
+
+    // 调度重复通知
+    await _scheduleRecurringNotifications(event, details);
+  }
+
+  // 根据重复类型调度未来的通知
+  Future<void> _scheduleRecurringNotifications(Event event, NotificationDetails details) async {
+    if (event.recurrenceType == RecurrenceType.none) return;
+    if (kIsWeb) return;
+
+    final int minutesBefore = event.notificationMinutesBefore;
+    final List<DateTime> futureDates = _calculateFutureOccurrences(event);
+
+    for (int i = 0; i < futureDates.length; i++) {
+      final DateTime notifyTime = futureDates[i].subtract(
+        Duration(minutes: minutesBefore),
+      );
+      final tz.TZDateTime scheduledDate = tz.TZDateTime.from(notifyTime, tz.local);
+
+      if (scheduledDate.isAfter(tz.TZDateTime.now(tz.local))) {
+        await _plugin.zonedSchedule(
+          event.id.hashCode + i + 1, // 使用不同的ID
+          '日历提醒',
+          event.title,
+          scheduledDate,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+      }
+    }
+  }
+
+  // 计算未来的发生日期
+  List<DateTime> _calculateFutureOccurrences(Event event) {
+    final List<DateTime> dates = [];
+    DateTime current = event.nextOccurrence;
+
+    int count;
+    switch (event.recurrenceType) {
+      case RecurrenceType.daily:
+        count = 7; // 调度未来7天
+        for (int i = 1; i <= count; i++) {
+          dates.add(current.add(Duration(days: i)));
+        }
+        break;
+      case RecurrenceType.weekly:
+        count = 4; // 调度未来4周
+        for (int i = 1; i <= count; i++) {
+          dates.add(current.add(Duration(days: i * 7)));
+        }
+        break;
+      case RecurrenceType.monthly:
+        count = 3; // 调度未来3个月
+        for (int i = 1; i <= count; i++) {
+          dates.add(DateTime(current.year, current.month + i, current.day));
+        }
+        break;
+      case RecurrenceType.yearly:
+        // 调度明年的通知
+        dates.add(DateTime(current.year + 1, current.month, current.day));
+        break;
+      case RecurrenceType.custom:
+        if (event.customIntervalDays != null && event.customIntervalDays! > 0) {
+          count = 5; // 调度未来5次
+          for (int i = 1; i <= count; i++) {
+            dates.add(current.add(Duration(days: i * event.customIntervalDays!)));
+          }
+        }
+        break;
+      case RecurrenceType.none:
+        break;
+    }
+
+    return dates;
   }
 
   Future<void> cancelNotification(String eventId) async {
     if (kIsWeb) return;
+    // 取消主通知和所有重复通知
     await _plugin.cancel(eventId.hashCode);
+    for (int i = 1; i <= 10; i++) {
+      await _plugin.cancel(eventId.hashCode + i);
+    }
   }
 }
 
@@ -1241,9 +1424,12 @@ class _AddEventSheetState extends State<AddEventSheet> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _customDaysController = TextEditingController();
+  final _customNotificationMinutesController = TextEditingController();
   late bool _isLunar;
   RecurrenceType _recurrenceType = RecurrenceType.yearly;
   int? _customIntervalDays;
+  NotificationTiming _notificationTiming = NotificationTiming.atTime;
+  int? _customNotificationMinutes;
   bool _isLeapMonth = false;
   bool _currentDayHasLeapMonth = false;
   late bool _isEditing;
@@ -1270,6 +1456,11 @@ class _AddEventSheetState extends State<AddEventSheet> {
       _customIntervalDays = event.customIntervalDays;
       if (_customIntervalDays != null) {
         _customDaysController.text = _customIntervalDays.toString();
+      }
+      _notificationTiming = event.notificationTiming;
+      _customNotificationMinutes = event.customNotificationMinutes;
+      if (_customNotificationMinutes != null) {
+        _customNotificationMinutesController.text = _customNotificationMinutes.toString();
       }
       _isLeapMonth = event.isLeapMonth;
 
@@ -1327,6 +1518,7 @@ class _AddEventSheetState extends State<AddEventSheet> {
     _titleController.dispose();
     _descriptionController.dispose();
     _customDaysController.dispose();
+    _customNotificationMinutesController.dispose();
     super.dispose();
   }
 
@@ -1355,6 +1547,18 @@ class _AddEventSheetState extends State<AddEventSheet> {
       if (customDays == null || customDays <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('请输入有效的自定义天数')),
+        );
+        return;
+      }
+    }
+
+    // 如果选择了自定义通知时间，解析自定义分钟数
+    int? customNotifyMinutes;
+    if (_notificationTiming == NotificationTiming.custom) {
+      customNotifyMinutes = int.tryParse(_customNotificationMinutesController.text);
+      if (customNotifyMinutes == null || customNotifyMinutes < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请输入有效的自定义提醒时间（分钟）')),
         );
         return;
       }
@@ -1390,6 +1594,8 @@ class _AddEventSheetState extends State<AddEventSheet> {
         isLeapMonth: _isLeapMonth, // 用户是否指定为闰月
         recurrenceType: _recurrenceType,
         customIntervalDays: customDays,
+        notificationTiming: _notificationTiming,
+        customNotificationMinutes: customNotifyMinutes,
       );
     } else {
       // 保存公历事件
@@ -1401,6 +1607,8 @@ class _AddEventSheetState extends State<AddEventSheet> {
         isLunar: false,
         recurrenceType: _recurrenceType,
         customIntervalDays: customDays,
+        notificationTiming: _notificationTiming,
+        customNotificationMinutes: customNotifyMinutes,
       );
     }
 
@@ -1606,6 +1814,67 @@ class _AddEventSheetState extends State<AddEventSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   suffixText: '天',
+                ),
+              ),
+            ],
+
+            // 提醒时间选择
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text(
+                  '提醒：',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.borderBeige),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<NotificationTiming>(
+                        value: _notificationTiming,
+                        isExpanded: true,
+                        icon: const Icon(Icons.arrow_drop_down, color: AppColors.primaryRed),
+                        items: NotificationTiming.values.map((timing) {
+                          return DropdownMenuItem<NotificationTiming>(
+                            value: timing,
+                            child: Text(
+                              timing.displayName,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _notificationTiming = value;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // 自定义提醒时间输入（仅当选择"自定义"时显示）
+            if (_notificationTiming == NotificationTiming.custom) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _customNotificationMinutesController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: '提前多少分钟提醒',
+                  hintText: '例如：60 表示提前1小时提醒',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  suffixText: '分钟',
                 ),
               ),
             ],

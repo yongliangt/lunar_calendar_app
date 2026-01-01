@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
   // Deep Vermilion (Red) - Primary Brand Color
@@ -21,15 +20,38 @@ class AppColors {
   static const Color borderBeige = Color(0xFFE0D8C0);
 }
 
+// Helper to create NotoSerifSC text theme using the bundled font
+TextTheme _notoSerifScTextTheme(TextTheme base) {
+  return base.copyWith(
+    displayLarge: base.displayLarge?.copyWith(fontFamily: 'NotoSerifSC'),
+    displayMedium: base.displayMedium?.copyWith(fontFamily: 'NotoSerifSC'),
+    displaySmall: base.displaySmall?.copyWith(fontFamily: 'NotoSerifSC'),
+    headlineLarge: base.headlineLarge?.copyWith(fontFamily: 'NotoSerifSC'),
+    headlineMedium: base.headlineMedium?.copyWith(fontFamily: 'NotoSerifSC'),
+    headlineSmall: base.headlineSmall?.copyWith(fontFamily: 'NotoSerifSC'),
+    titleLarge: base.titleLarge?.copyWith(fontFamily: 'NotoSerifSC'),
+    titleMedium: base.titleMedium?.copyWith(fontFamily: 'NotoSerifSC'),
+    titleSmall: base.titleSmall?.copyWith(fontFamily: 'NotoSerifSC'),
+    bodyLarge: base.bodyLarge?.copyWith(fontFamily: 'NotoSerifSC'),
+    bodyMedium: base.bodyMedium?.copyWith(fontFamily: 'NotoSerifSC'),
+    bodySmall: base.bodySmall?.copyWith(fontFamily: 'NotoSerifSC'),
+    labelLarge: base.labelLarge?.copyWith(fontFamily: 'NotoSerifSC'),
+    labelMedium: base.labelMedium?.copyWith(fontFamily: 'NotoSerifSC'),
+    labelSmall: base.labelSmall?.copyWith(fontFamily: 'NotoSerifSC'),
+  );
+}
+
 class AppTheme {
   static ThemeData get lightTheme {
+    final baseTextTheme = ThemeData.light().textTheme;
+    
     return ThemeData(
       useMaterial3: true,
       primaryColor: AppColors.primaryRed,
       scaffoldBackgroundColor: AppColors.backgroundBeige,
       
-      // Typography
-      textTheme: GoogleFonts.notoSerifScTextTheme().apply(
+      // Typography - using bundled NotoSerifSC font
+      textTheme: _notoSerifScTextTheme(baseTextTheme).apply(
         bodyColor: AppColors.textPrimary,
         displayColor: AppColors.textPrimary,
       ),
@@ -45,7 +67,7 @@ class AppTheme {
           color: AppColors.accentGold,
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          fontFamily: 'Noto Serif SC', // Fallback if GoogleFonts fails initially
+          fontFamily: 'NotoSerifSC',
         ),
       ),
       

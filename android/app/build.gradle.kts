@@ -48,8 +48,8 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.example.lunar_calendar_app"
-        // 你的 minSdkVersion
-        minSdkVersion 23
+        // 最低支持 Android 15 (API 35)
+        minSdkVersion 35
         // 重点: 确保 targetSdk 至少为 35 (Android 15)
         targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
