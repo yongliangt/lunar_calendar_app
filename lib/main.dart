@@ -905,7 +905,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           // Custom Header with Beautiful Design
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(top: 50, bottom: 24),
+            padding: const EdgeInsets.only(top: 20, bottom: 10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topCenter,
@@ -956,7 +956,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     '༄',
                     style: TextStyle(
                       color: AppColors.accentGold.withValues(alpha: 0.4),
-                      fontSize: 36,
+                      fontSize: 24,
                     ),
                   ),
                 ),
@@ -968,7 +968,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     '༄',
                     style: TextStyle(
                       color: AppColors.accentGold.withValues(alpha: 0.4),
-                      fontSize: 36,
+                      fontSize: 24,
                     ),
                   ),
                 ),
@@ -990,13 +990,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 6),
                     // Title with shadow
                     const Text(
                       '農曆日曆',
                       style: TextStyle(
                         color: AppColors.accentGold,
-                        fontSize: 34,
+                        fontSize: 26,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Noto Serif SC',
                         letterSpacing: 6,
@@ -1009,7 +1009,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     // Year with decorative brackets
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1018,7 +1018,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           '【 ',
                           style: TextStyle(
                             color: AppColors.accentGold.withValues(alpha: 0.6),
-                            fontSize: 18,
+                            fontSize: 14,
                             fontFamily: 'Noto Serif SC',
                           ),
                         ),
@@ -1026,7 +1026,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           TymeUtil.getLunarDate(_focusedDay).getLunarMonth().getLunarYear().getName(),
                           style: const TextStyle(
                             color: AppColors.accentGold,
-                            fontSize: 18,
+                            fontSize: 14,
                             fontWeight: FontWeight.w500,
                             fontFamily: 'Noto Serif SC',
                             letterSpacing: 3,
@@ -1036,13 +1036,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ' 】',
                           style: TextStyle(
                             color: AppColors.accentGold.withValues(alpha: 0.6),
-                            fontSize: 18,
+                            fontSize: 14,
                             fontFamily: 'Noto Serif SC',
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 6),
                     // Golden decorative line below
                     Container(
                       width: 100,
@@ -1203,12 +1203,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           return Container(
                             margin: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryRed,
+                              color: Color(0xFFFFD700),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.primaryRed),
+                              border: Border.all(color: Color(0xFFFFD700)),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryRed.withValues(alpha: 0.3),
+                                  color: Color(0xFFFFD700).withValues(alpha: 0.4),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 )
@@ -1222,14 +1222,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     '${day.day}',
                                     style: const TextStyle(
                                         fontSize: 16,
-                                        color: AppColors.accentGold,
+                                        color: Colors.black,
                                         fontWeight: FontWeight.bold),
                                   ),
                                   Text(
                                     lunarText,
                                     style: const TextStyle(
                                       fontSize: 10,
-                                      color: AppColors.accentGold,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ],
