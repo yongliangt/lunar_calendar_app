@@ -1275,24 +1275,110 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                   const SizedBox(height: 20),
                   
+                  // Selected Day Info (Lunar Date and Festival)
+                  Builder(
+                    builder: (context) {
+                      final LunarDay lunar = TymeUtil.getLunarDate(_selectedDay!);
+                      final LunarYear lunarYear = lunar.getLunarMonth().getLunarYear();
+                      final String solarDate = DateFormat.yMMMd('zh_CN').format(_selectedDay!);
+                      final String lunarDate = "${lunarYear.getName()} ${lunar.getLunarMonth().getName()}${lunar.getName()}";
+                      final LunarFestival? festival = lunar.getFestival();
+                      
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceBeige,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.borderBeige),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            // Solar and Lunar Date
+                            Text(
+                              solarDate,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              lunarDate,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: AppColors.primaryRed,
+                                fontFamily: 'Noto Serif SC',
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            // Lunar Festival (农历节日)
+                            if (festival != null) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.primaryRed.withValues(alpha: 0.1),
+                                      AppColors.accentGold.withValues(alpha: 0.15),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: AppColors.accentGold.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.celebration,
+                                      color: AppColors.primaryRed,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '🎊 ${festival.getName()}',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primaryRed,
+                                        fontFamily: 'Noto Serif SC',
+                                        letterSpacing: 2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
                   // Event List
                   ValueListenableBuilder<List<Event>>(
                     valueListenable: _selectedEvents,
                     builder: (context, value, _) {
                       if (value.isEmpty) {
-                        final LunarDay lunar = TymeUtil.getLunarDate(_selectedDay!);
-                        final LunarYear lunarYear =
-                            lunar.getLunarMonth().getLunarYear();
-                        final String solarDate =
-                            DateFormat.yMMMd('zh_CN').format(_selectedDay!);
-                        final String lunarDate =
-                            "${lunarYear.getName()} ${lunar.getLunarMonth().getName()}${lunar.getName()}";
-
                         return Center(
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Text(
-                              '$solarDate\n$lunarDate\n\n无提醒事项',
+                              '无提醒事项',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                   color: Colors.grey[600],
