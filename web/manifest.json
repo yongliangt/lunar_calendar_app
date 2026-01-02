@@ -1,11 +1,11 @@
 {
-    "name": "lunar_calendar_app",
-    "short_name": "lunar_calendar_app",
+    "name": "农历日历",
+    "short_name": "农历日历",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#A52422",
+    "theme_color": "#A52422",
+    "description": "精美农历日历应用，支持农历节日显示、事件提醒",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

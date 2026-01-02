@@ -1,4 +1,4 @@
-package com.example.lunar_calendar_app
+package com.tuayongliang.lunarcalendar
 
 import io.flutter.embedding.android.FlutterActivity
 

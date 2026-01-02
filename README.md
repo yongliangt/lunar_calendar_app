@@ -7,31 +7,17 @@
 ### 📅 日历功能
 - 支持农历和公历双日历显示
 - 可视化日期选择，每个日期显示对应的农历日期
-- **周末高亮**3. **农历计算**: 农历日期由 `tyme` 库计算，支持准确的农历月份和闰月判断。
-
-4. **数据存储**: 数据存储在本地浏览器/设备中，不同设备间不会同步。
-
-5. **字体**: 应用使用本地打包的 Noto Serif SC 字体，确保中文显示一致性，无需网络下载。
-
-## 📄 许可证
-
-MIT License
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
----
-
-**作者**: [yongliangt](https://github.com/yongliangt)显示，区别于工作日
+- **周末高亮** - 红色显示，区别于工作日
 - 流畅的月份切换和日期导航动画
 - **快速跳转** - 点击月份标题可快速选择年月进行跳转
 - **返回今天** - 导航到其他月份时，显示"返回今天"按钮，一键返回当前日期
+- **农历节日显示** - 选中日期时自动显示当天农历节日（如春节、中秋等）🎊
 
 ### 🔔 事件提醒
 - **农历提醒**: 根据农历日期设置提醒（如生日、传统节日）
 - **公历提醒**: 根据公历日期设置提醒
 - **闰月支持**: 自动识别并支持闰月日期的提醒设置
+- **通知时机**: 支持多种提醒时间（准时、15分钟前、1小时前、1天前、自定义）
 
 ### 🔄 灵活的重复选项
 - 不重复 - 一次性事件
@@ -52,6 +38,7 @@ MIT License
 - 优雅的 Noto Serif SC 中文衬线字体
 - 流畅的动画和过渡效果
 - 周末日期红色高亮显示
+- **金色选中日期** - 选中日期以金色背景突出显示
 
 ## 📁 项目结构
 
@@ -65,7 +52,7 @@ lunar_calendar_app/
 │       └── NotoSerifSC-Regular.ttf  # 中文衬线字体
 ├── android/
 │   └── app/
-│       ├── build.gradle.kts   # Android 构建配置
+│       ├── build.gradle       # Android 构建配置
 │       └── src/main/
 │           └── AndroidManifest.xml  # Android 权限配置
 ├── ios/                   # iOS 平台配置
@@ -124,9 +111,10 @@ flutter run -d ios
 
 确保以下配置已正确设置：
 
-- `minSdkVersion`: 35 (Android 15)
-- `compileSdkVersion`: 35
-- `targetSdkVersion`: 35
+- `minSdkVersion`: 21
+- `compileSdkVersion`: 36
+- `targetSdkVersion`: 36
+- `coreLibraryDesugaringEnabled`: true
 
 ### 必要权限 (AndroidManifest.xml)
 - `POST_NOTIFICATIONS` - 通知权限
@@ -154,7 +142,8 @@ flutter run -d ios
 2. 输入事件标题和备注（可选）
 3. 选择 **农历** 或 **公历**
 4. 选择重复频率（不重复、每天、每星期、每月、每年、自定义）
-5. 点击 **保存**
+5. 选择通知时机（准时、提前15分钟、提前1小时等）
+6. 点击 **保存**
 
 ### 编辑/删除提醒
 - **点击事件** 进入编辑模式
@@ -168,7 +157,9 @@ flutter run -d ios
 
 3. **农历计算**: 农历日期由 `tyme` 库计算，支持准确的农历月份和闰月判断。
 
-4. **数据存储**: 数据存储在本地浏览器/设备中，不同设备间不会同步。
+4. **数据存储**: 数据存储在本地设备中，不同设备间不会同步。
+
+5. **字体**: 应用使用本地打包的 Noto Serif SC 字体，确保中文显示一致性，无需网络下载。
 
 ## 📄 许可证
 
@@ -177,3 +168,7 @@ MIT License
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
+
+---
+
+**作者**: [yongliangt](https://github.com/yongliangt)

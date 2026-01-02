@@ -15,7 +15,7 @@
 
 
     <application
-        android:label="lunar_calendar_app"
+        android:label="农历日历"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
